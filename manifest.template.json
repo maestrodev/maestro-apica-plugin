@@ -1,0 +1,72 @@
+{
+  "source_types": [{
+    "name": "Apica",
+    "options": {
+      "server_url": "String",
+      "user": "String",
+      "password": "Password",
+      "timeout": "Integer"
+    }
+  }],
+  "tasks": [{
+    "name": "apica tests",
+    "description": "Run A Series Of Tests On Apica",
+    "license": "Apache 2.0",
+    "author":  "Doug Henderson",
+    "version": "updated at build time",
+    "class":   "MaestroDev::ApicaWorker",
+    "type":    "ruby",
+    "dependencies":[
+    ],
+    "task":{
+      "command": "/apica/loadtest",
+      "inputs": {
+        "server_url": {
+          "description": "Base URL Of The Apica Server",
+          "required": true,
+          "type": "String",
+          "value": "localhost"
+        },
+        "user": {
+          "description": "User To Authenticate As",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "password": {
+          "description": "Password To Use For Login",
+          "required": false,
+          "type": "Password",
+          "value": ""
+        },
+        "command_string": {
+          "description": "Tests To Execute",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "comparison_history": {
+          "description": "Compare Results With The Last n Runs",
+          "required": false,
+          "type": "Integer",
+          "value": 5
+        },
+        "report_mailing_list": {
+          "description": "List Of Email Addresses To Receive Output",
+          "required": false,
+          "type": "Array",
+          "value": []
+        },
+        "timeout": {
+          "description": "How Many Seconds Before Test Considered Timed Out?",
+          "required": false,
+          "type": "Integer",
+          "value": 900
+        }
+      },
+      "outputs": {"output" : {"type" : "String"}},
+      "tool_name": "Test",
+      "icon": "apica.png"
+    }
+  }]
+}

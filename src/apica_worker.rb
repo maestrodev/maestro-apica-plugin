@@ -170,6 +170,7 @@ module MaestroDev
             if !report_url.nil? && !report_url.empty?
               url_meta["Job ##{job_id}"] = report_url
               add_link("Apica Job ##{job_id}", report_url)
+              write_output("\nJob #{job_id}: Report viewable at #{report_url}")
             end
 
             meta = apica_data[APICA_KEY_METADATA] || {}
@@ -231,8 +232,22 @@ module MaestroDev
 
     def get_http(uri)
       # Get appropriate http/https
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = (uri.scheme == "https")
+      # Check for proxy settings
+      s = (uri.scheme == 'https')
+
+      proxy_url = ENV[s ? 'https_proxy' : 'http_proxy'] || ENV[s ? 'HTTPS_PROXY' : 'HTTP_PROXY'] || ''
+      proxy_uri = nil
+
+      if !proxy_url.empty?
+        begin
+          proxy_uri = URI.parse(proxy_url)
+        rescue Exception
+          write_output("\nIgnoring bad proxy URL '#{proxy_url}'")
+        end
+      end
+
+      http = proxy_uri ? Net::HTTP.new(uri.host, uri.port, proxy_uri.host, proxy_uri.port) : Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = s
       http
     end
 

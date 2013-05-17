@@ -6,16 +6,22 @@ require 'timeout'
 require 'maestro_plugin'
 
 module MaestroDev
-  class ForbiddenError < StandardError
+  class PermissionsError < StandardError
   end
 
-  class UnauthorizedError < StandardError
+  class ForbiddenError < PermissionsError
+  end
+
+  class UnauthorizedError < PermissionsError
   end
 
   class ApicaAPIError < StandardError
   end
 
   class TestAbortError < StandardError
+  end
+
+  class ConfigError < StandardError
   end
 
   class ApicaWorker < Maestro::MaestroWorker
@@ -70,13 +76,13 @@ module MaestroDev
 
       errors = []
       errors << 'Invalid server' if @server_url.empty?
-      errors << "Server URL must start with 'http://' or 'https://'" if !@server_url.start_with?('http://', 'https://') 
+      errors << "Server URL must start with 'http://' or 'https://'" if !@server_url.start_with?('http://', 'https://')
       errors << 'Invalid user' if @user.empty?
       errors << 'No tests specified' if @test_list.empty?
       errors << "Comparison History must be between 0 and #{MAX_COMPARISON_HISTORY}" if @comparison_history < 0 || @comparison_history > MAX_COMPARISON_HISTORY
 
       if !errors.empty?
-        raise "Configuration errors: #{errors.join(', ')}"
+        raise ConfigError, "Configuration errors: #{errors.join(', ')}"
       end
     end
 
@@ -185,12 +191,15 @@ module MaestroDev
 
         save_output_value('test', test_meta)
         save_output_value('links', url_meta)
+      rescue ConfigError, TestAbortError, ApicaAPIError, PermissionsError => e
+        @error = e.message
       rescue Exception => e
-        set_error("Error executing Apica Tests: #{e.class} #{e}")
+        @error = "Error executing Apica Tests: #{e.class} #{e}"
         Maestro.log.warn("Error executing Apica Tests: #{e.class} #{e}: " + e.backtrace.join("\n"))
       end
 
       write_output "\n\nAPICA LOADTEST task complete"
+      set_error(@error) if @error
     end
 
     ###########
@@ -281,7 +290,7 @@ module MaestroDev
         end
       end
     end
-    
+
     def do_get(path, options = {})
       do_http(path, nil, options) { |uri, data, options|
         Net::HTTP::Get.new(uri.path)

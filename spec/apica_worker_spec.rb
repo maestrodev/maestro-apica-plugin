@@ -36,7 +36,7 @@ describe MaestroDev::ApicaWorker do
       
       workitem = {'fields' => {}}
       @worker.perform(:loadtest, workitem)
-      workitem['fields']['__error__'].should include('Error executing Apica Tests: RuntimeError Configuration errors:')
+      workitem['fields']['__error__'].should include('Configuration errors:')
     end
 
     it "should connect to a remote server and execute a given set of commands" do

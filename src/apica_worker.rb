@@ -61,7 +61,39 @@ module MaestroDev
     APICA_KEY_PERF_KEEP_ALIVE_EFFICIENCY = 'Http keep-alive efficiency'                # Decimal
     APICA_KEY_PERF_AVG_NETWORK_CONNECT_TIME = 'Avg network connect time (ms)'          # Int
     APICA_KEY_PERF_TOTAL_TRANSMITTED_BYTES = 'Total transmitted bytes'                 # Int
-    
+
+    MAESTRO_KEY_PERF_TOTAL_PASS_LOOPS = 'tot_passed_loops'
+    MAESTRO_KEY_PERF_TOTAL_FAIL_LOOPS = 'tot_failed_loops'
+    MAESTRO_KEY_PERF_SESSION_FAILURE_RATE = 'session_failure_rate'
+    MAESTRO_KEY_PERF_URL_ERROR_RATE = 'url_error_rate'
+    MAESTRO_KEY_PERF_AVG_THROUGHPUT = 'avg_net_throughput'
+    MAESTRO_KEY_PERF_AVG_THROUGHPUT_UNIT = 'avg_net_throughput_unit'
+    MAESTRO_KEY_PERF_AVG_SESSION_TIME_PER_LOOP = 'avg_session_time'
+    MAESTRO_KEY_PERF_AVG_RESPONSE_TIME_PER_LOOP = 'avg_response_time'
+    MAESTRO_KEY_PERF_WEB_TRANSACTION_RATE = 'web_transaction_rate'
+    MAESTRO_KEY_PERF_AVG_RESPONSE_TIME_PER_PAGE = 'avg_page_response_time'
+    MAESTRO_KEY_PERF_TOTAL_HTTP_CALLS = 'tot_http_calls'
+    MAESTRO_KEY_PERF_KEEP_ALIVE_EFFICIENCY = 'http_keepalive_efficiency'
+    MAESTRO_KEY_PERF_AVG_NETWORK_CONNECT_TIME = 'avg_net_connect_time'
+    MAESTRO_KEY_PERF_TOTAL_TRANSMITTED_BYTES = 'tot_transmitted_bytes'
+
+    STATS_MAPPING = {
+      MAESTRO_KEY_PERF_TOTAL_PASS_LOOPS => APICA_KEY_PERF_TOTAL_PASS_LOOPS,
+      MAESTRO_KEY_PERF_TOTAL_FAIL_LOOPS => APICA_KEY_PERF_TOTAL_FAIL_LOOPS,
+      MAESTRO_KEY_PERF_SESSION_FAILURE_RATE => APICA_KEY_PERF_SESSION_FAILURE_RATE,
+      MAESTRO_KEY_PERF_URL_ERROR_RATE => APICA_KEY_PERF_URL_ERROR_RATE,
+      MAESTRO_KEY_PERF_AVG_THROUGHPUT => APICA_KEY_PERF_AVG_THROUGHPUT,
+      MAESTRO_KEY_PERF_AVG_THROUGHPUT_UNIT => APICA_KEY_PERF_AVG_THROUGHPUT_UNIT,
+      MAESTRO_KEY_PERF_AVG_SESSION_TIME_PER_LOOP => APICA_KEY_PERF_AVG_SESSION_TIME_PER_LOOP,
+      MAESTRO_KEY_PERF_AVG_RESPONSE_TIME_PER_LOOP => APICA_KEY_PERF_AVG_RESPONSE_TIME_PER_LOOP,
+      MAESTRO_KEY_PERF_WEB_TRANSACTION_RATE => APICA_KEY_PERF_WEB_TRANSACTION_RATE,
+      MAESTRO_KEY_PERF_AVG_RESPONSE_TIME_PER_PAGE => APICA_KEY_PERF_AVG_RESPONSE_TIME_PER_PAGE,
+      MAESTRO_KEY_PERF_TOTAL_HTTP_CALLS => APICA_KEY_PERF_TOTAL_HTTP_CALLS,
+      MAESTRO_KEY_PERF_KEEP_ALIVE_EFFICIENCY => APICA_KEY_PERF_KEEP_ALIVE_EFFICIENCY,
+      MAESTRO_KEY_PERF_AVG_NETWORK_CONNECT_TIME => APICA_KEY_PERF_AVG_NETWORK_CONNECT_TIME,
+      MAESTRO_KEY_PERF_TOTAL_TRANSMITTED_BYTES => APICA_KEY_PERF_TOTAL_TRANSMITTED_BYTES
+    }
+
     def validate_parameters
       # Server & Auth
       @server_url = get_field('server_url', '')
@@ -184,7 +216,10 @@ module MaestroDev
             perf[WELL_KNOWN_FAIL] = perf[APICA_KEY_PERF_TOTAL_FAIL_LOOPS] || 0
             perf[WELL_KNOWN_TOTAL] = perf[WELL_KNOWN_PASS] + perf[WELL_KNOWN_FAIL]
 
-            test_meta << {"Job ##{job_id}" => perf}
+            stats = {}
+            STATS_MAPPING.each { |k, v| stats[k] = perf[v] if perf[v]}
+
+            test_meta << {"Job ##{job_id}" => stats}
           else
             Maestro.log.debug "Row is blank, skipping"
           end

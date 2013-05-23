@@ -5,7 +5,6 @@ GEM
     bouncy-castle-java (1.5.0147)
     crack (0.3.2)
     diff-lcs (1.2.4)
-    git (1.2.5)
     jruby-openssl (0.8.8)
       bouncy-castle-java (>= 1.5.0147)
     json (1.8.0-java)
@@ -21,8 +20,6 @@ GEM
     mocha (0.10.0)
       metaclass (~> 0.0.1)
     multi_json (1.7.3)
-    nokogiri (1.5.9-java)
-    rake (0.9.2.2)
     rcov (0.9.11-java)
     rspec (2.13.0)
       rspec-core (~> 2.13.0)
@@ -36,20 +33,14 @@ GEM
     webmock (1.11.0)
       addressable (>= 2.2.7)
       crack (>= 0.3.2)
-    zippy (0.2.1)
-      rubyzip (>= 0.9.1)
 
 PLATFORMS
   java
 
 DEPENDENCIES
-  git
   jruby-openssl
   maestro_plugin (>= 0.0.5)
   mocha (= 0.10.0)
-  nokogiri
-  rake (~> 0.9.2.2)
   rcov (= 0.9.11)
   rspec
   webmock
-  zippy

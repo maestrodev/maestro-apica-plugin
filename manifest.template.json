@@ -9,8 +9,8 @@
     }
   }],
   "tasks": [{
-    "name": "apica tests",
-    "description": "Run A Series Of Tests On Apica",
+    "name": "apica loadtest",
+    "description": "Run A LoadTest On Apica",
     "license": "Apache 2.0",
     "author":  "Doug Henderson",
     "version": "updated at build time",

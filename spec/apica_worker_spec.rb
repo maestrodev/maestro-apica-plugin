@@ -17,14 +17,14 @@
 
 require 'spec_helper'
 
-describe MaestroDev::ApicaWorker do
+describe MaestroDev::Apica::ApicaWorker do
   BASE_URL = "apica.sample.com/test"
   JOB_ID = "42"
   
   describe '/apica/loadtest' do
     before(:each) do
       Maestro::MaestroWorker.mock!
-      @worker = MaestroDev::ApicaWorker.new
+      @worker = MaestroDev::Apica::ApicaWorker.new
       @server_url = "http://#{BASE_URL}"
       @user = 'test'
       @password = 'pass'

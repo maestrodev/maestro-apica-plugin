@@ -14,7 +14,7 @@
     "license": "Apache 2.0",
     "author":  "Doug Henderson",
     "version": "updated at build time",
-    "class":   "MaestroDev::ApicaWorker",
+    "class":   "MaestroDev::Apica::ApicaWorker",
     "type":    "ruby",
     "dependencies":[
     ],

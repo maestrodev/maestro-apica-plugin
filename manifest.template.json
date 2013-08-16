@@ -27,6 +27,12 @@
           "type": "String",
           "value": "localhost"
         },
+        "customer_id": {
+          "description": "LTP Customer ID",
+          "required": true,
+          "type": "Integer",
+          "value": 0
+        },
         "user": {
           "description": "User To Authenticate As",
           "required": true,
@@ -62,6 +68,175 @@
           "required": false,
           "type": "Integer",
           "value": 900
+        }
+      },
+      "outputs": {"output" : {"type" : "String"}},
+      "tool_name": "Test",
+      "icon": "apica.png"
+    }
+  },
+  {
+    "name": "apica wpm (last result)",
+    "description": "Fetch Apica WebPerformance Data",
+    "license": "Apache 2.0",
+    "author":  "Doug Henderson",
+    "version": "updated at build time",
+    "class":   "MaestroDev::ApicaWorker",
+    "type":    "ruby",
+    "dependencies":[
+    ],
+    "task":{
+      "command": "/apica/wpm_last_check",
+      "inputs": {
+        "server_url": {
+          "description": "Base URL Of The Apica Server",
+          "required": true,
+          "type": "String",
+          "value": "localhost"
+        },
+        "user": {
+          "description": "User To Authenticate As",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "password": {
+          "description": "Password To Use For Login",
+          "required": false,
+          "type": "Password",
+          "value": ""
+        },
+        "check_guid": {
+          "description": "Unique Identifier For A Check",
+          "required": true,
+          "type": "String",
+          "value": ""
+        }
+      },
+      "outputs": {"output" : {"type" : "String"}},
+      "tool_name": "Test",
+      "icon": "apica.png"
+    }
+  },
+  {
+    "name": "apica wpm (aggregated)",
+    "description": "Fetch Apica WebPerformance Data",
+    "license": "Apache 2.0",
+    "author":  "Doug Henderson",
+    "version": "updated at build time",
+    "class":   "MaestroDev::ApicaWorker",
+    "type":    "ruby",
+    "dependencies":[
+    ],
+    "task":{
+      "command": "/apica/wpm_aggregated",
+      "inputs": {
+        "server_url": {
+          "description": "Base URL Of The Apica Server",
+          "required": true,
+          "type": "String",
+          "value": "localhost"
+        },
+        "user": {
+          "description": "User To Authenticate As",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "password": {
+          "description": "Password To Use For Login",
+          "required": false,
+          "type": "Password",
+          "value": ""
+        },
+        "check_guid": {
+          "description": "Unique Identifier For A Check",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "from_date": {
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "to_date": {
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "detail_level": {
+          "required": true,
+          "type": "Integer",
+          "value": 1
+        },
+        "scope": {
+          "required": true,
+          "type": "String",
+          "value": "d"
+        }
+      },
+      "outputs": {"output" : {"type" : "String"}},
+      "tool_name": "Test",
+      "icon": "apica.png"
+    }
+  },
+  {
+    "name": "apica wpm (most recent)",
+    "description": "Fetch Apica WebPerformance Data",
+    "license": "Apache 2.0",
+    "author":  "Doug Henderson",
+    "version": "updated at build time",
+    "class":   "MaestroDev::ApicaWorker",
+    "type":    "ruby",
+    "dependencies":[
+    ],
+    "task":{
+      "command": "/apica/wpm_most_recent",
+      "inputs": {
+        "server_url": {
+          "description": "Base URL Of The Apica Server",
+          "required": true,
+          "type": "String",
+          "value": "localhost"
+        },
+        "user": {
+          "description": "User To Authenticate As",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "password": {
+          "description": "Password To Use For Login",
+          "required": false,
+          "type": "Password",
+          "value": ""
+        },
+        "check_guid": {
+          "description": "Unique Identifier For A Check",
+          "required": true,
+          "type": "String",
+          "value": ""
+        },
+        "count": {
+          "required": true,
+          "type": "Integer",
+          "value": 10
+        },
+        "from_date": {
+          "required": false,
+          "type": "String",
+          "value": ""
+        },
+        "to_date": {
+          "required": false,
+          "type": "String",
+          "value": ""
+        },
+        "detail_level": {
+          "required": true,
+          "type": "Integer",
+          "value": 1
         }
       },
       "outputs": {"output" : {"type" : "String"}},

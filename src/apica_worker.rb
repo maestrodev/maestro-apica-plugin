@@ -192,14 +192,6 @@ module MaestroDev
                 write_output("\nJob #{job_id}: Report viewable at #{report_url}")
               end
             end
-
-            save_output_value('test', test_meta)
-            save_output_value('links', url_meta)
-          rescue ConfigError, TestAbortError, ApicaAPIError, PermissionsError => e
-            @error = e.message
-          rescue Exception => e
-            @error = "Error executing Apica Tests: #{e.class} #{e}"
-            Maestro.log.warn("Error executing Apica Tests: #{e.class} #{e}: " + e.backtrace.join("\n"))
           end
 
           save_output_value('test', test_meta)
@@ -523,6 +515,7 @@ module MaestroDev
         # Auth debug
         username_s = !@user.empty? ? " with username #{@user}" : ""
         Maestro.log.debug("Performing #{request.method} #{uri}#{username_s}")
+#        write_output("\nPerforming #{request.method} #{uri}#{username_s}")
 
         http.start do |http|
           response = http.request(request)
@@ -544,64 +537,17 @@ module MaestroDev
               Maestro.log.debug("Not following redirect to #{new_url}")
               response
             end
-          end
+          else
+            Maestro.log.debug "Error in #{request.method} #{uri}#{username_s}: #{response.code} #{response.message}"
 
-          http = proxy_uri ? Net::HTTP.new(uri.host, uri.port, proxy_uri.host, proxy_uri.port) : Net::HTTP.new(uri.host, uri.port)
-          http.use_ssl = s
-          http
-        end
-
-        def do_http(path, data, options)
-          options = options.merge({:follow_redirect => true})
-
-          # Get URI
-          uri = URI.parse @server_url
-          escaped_path = URI.escape(path)
-          uri = URI.parse("#{@server_url}#{escaped_path}")
-
-          http = get_http(uri)
-
-          # Do the request
-          request = yield(uri, data, options)
-          request.basic_auth(@user, @password) 
-
-          # Auth debug
-          username_s = !@user.empty? ? " with username #{@user}" : ""
-          Maestro.log.debug("Performing #{request.method} #{uri}#{username_s}")
-#        write_output("\nPerforming #{request.method} #{uri}#{username_s}")
-
-          http.start do |http|
-            response = http.request(request)
-
-            case response
-            when Net::HTTPSuccess     then 
-              return response
-            when Net::HTTPRedirection then
-              new_url = response['location']
-
-              if options[:follow_redirect]
-                # Make sure we don't follow our tail
-                redir_options = options.clone
-                redir_options[:follow_redirect] = false
-
-                Maestro.log.debug("Redirected to #{new_url}")
-                do_get(new_url)
-              else
-                Maestro.log.debug("Not following redirect to #{new_url}")
-                response
-              end
+            case response.code
+            when 401 then # UNAUTHORIZED
+              rause UnauthorizedError, 'Not permitted access (did you specify a user/password?)'
+            when 403 then # FORBIDDEN
+              raise ForbiddenError, 'User or Password is incorrect'
             else
-              Maestro.log.debug "Error in #{request.method} #{uri}#{username_s}: #{response.code} #{response.message}"
-
-              case response.code
-              when 401 then # UNAUTHORIZED
-                rause UnauthorizedError, 'Not permitted access (did you specify a user/password?)'
-              when 403 then # FORBIDDEN
-                raise ForbiddenError, 'User or Password is incorrect'
-              else
-                write_output("\nError in #{request.method} #{uri}#{username_s}: #{response.code} #{response.message}")
-                response.error!
-              end
+              write_output("\nError in #{request.method} #{uri}#{username_s}: #{response.code} #{response.message}")
+              response.error!
             end
           end
         end

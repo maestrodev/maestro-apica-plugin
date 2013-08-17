@@ -6,7 +6,7 @@ require 'timeout'
 require 'maestro_plugin'
 
 module MaestroDev
-  module Plugin
+  module ApicaPlugin
     class PermissionsError < StandardError
     end
 

@@ -17,7 +17,7 @@
 
 require 'spec_helper'
 
-describe MaestroDev::Plugin::ApicaWorker do
+describe MaestroDev::ApicaPlugin::ApicaWorker do
   BASE_URL = "apica.sample.com/test"
   APICA_URL = "#{BASE_URL}/ltp/live/customers/1/selfservicejobs"
   JOB_ID = "42"
@@ -25,7 +25,7 @@ describe MaestroDev::Plugin::ApicaWorker do
   describe '/apica/loadtest' do
     before(:each) do
       Maestro::MaestroWorker.mock!
-      @worker = MaestroDev::Plugin::ApicaWorker.new
+      @worker = MaestroDev::ApicaPlugin::ApicaWorker.new
       @server_url = "http://#{BASE_URL}"
       @user = 'test'
       @password = 'pass'

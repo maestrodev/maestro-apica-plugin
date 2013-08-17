@@ -191,6 +191,22 @@ module MaestroDev
                 add_link("Apica Job ##{job_id}", report_url)
                 write_output("\nJob #{job_id}: Report viewable at #{report_url}")
               end
+
+              meta = apica_data[APICA_KEY_METADATA] || {}
+              perf = apica_data[APICA_KEY_PERF] || {}
+
+              # Add some meta-meta
+              # Like total test #, duration, etc
+              # using what will hopefully be "well known keys" so UI doesn't have to be too smart
+              perf[WELL_KNOWN_DURATION] = meta[APICA_KEY_METADATA_DURATION] || 0
+              perf[WELL_KNOWN_PASS] = perf[APICA_KEY_PERF_TOTAL_PASS_LOOPS] || 0
+              perf[WELL_KNOWN_FAIL] = perf[APICA_KEY_PERF_TOTAL_FAIL_LOOPS] || 0
+              perf[WELL_KNOWN_TOTAL] = perf[WELL_KNOWN_PASS] + perf[WELL_KNOWN_FAIL]
+
+              stats = {}
+              STATS_MAPPING.each { |k, v| stats[k] = perf[v] if perf[v]}
+
+              test_meta << {"Job ##{job_id}" => stats}
             end
           end
 
@@ -489,8 +505,6 @@ module MaestroDev
           rescue Exception
             write_output("\nIgnoring bad proxy URL '#{proxy_url}'")
           end
-
-          apica_data
         end
 
         http = proxy_uri ? Net::HTTP.new(uri.host, uri.port, proxy_uri.host, proxy_uri.port) : Net::HTTP.new(uri.host, uri.port)

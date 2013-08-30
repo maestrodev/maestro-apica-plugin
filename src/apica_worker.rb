@@ -6,24 +6,7 @@ require 'timeout'
 require 'maestro_plugin'
 
 module MaestroDev
-  module ApicaPlugin
-    class PermissionsError < StandardError
-    end
-
-    class ForbiddenError < PermissionsError
-    end
-
-    class UnauthorizedError < PermissionsError
-    end
-
-    class ApicaAPIError < StandardError
-    end
-
-    class TestAbortError < StandardError
-    end
-
-    class ConfigError < StandardError
-    end
+  module Plugin
 
     class ApicaWorker < Maestro::MaestroWorker
       DEFAULT_COMPARISON_HISTORY = 5
@@ -103,226 +86,182 @@ module MaestroDev
       WPM_MOST_RECENT = :most_recent
 
       def loadtest
-        write_output("\nAPICA LOADTEST task starting", :buffer => true)
+        # Raises error if invalid params passed
+        validate_loadtest_parameters
 
-        begin
-          # Raises error if invalid params passed
-          validate_loadtest_parameters
+        # Fix test-list so its an array
+        @test_list = @test_list.split("\n")
+        @test_list.delete_if {|v| v.nil? || v.empty?}
 
-          # Fix test-list so its an array
-          @test_list = @test_list.split("\n")
-          @test_list.delete_if {|v| v.nil? || v.empty?}
+#          write_output("\n\nConfiguration:", :buffer => true)
+#          write_output("\n  Server URL: #{@server_url}", :buffer => true)
+#          write_output("\n  Customer ID: #{@customer_id}", :buffer => true)
+#          write_output("\n  User: #{@user}", :buffer => true)
+#          write_output("\n  Password: ********", :buffer => true)
+#          write_output("\n  Timeout: #{@timeout} seconds", :buffer => true)
+#          write_output("\n  Compare against: last #{@comparison_history} runs", :buffer => true)
+#          write_output("\n  Email test reports to: #{@report_mailing_list.join(', ')}", :buffer => true)
+#          write_output("\n  Total tests to run: #{@test_list.size}")
 
-          write_output("\n\nConfiguration:", :buffer => true)
-          write_output("\n  Server URL: #{@server_url}", :buffer => true)
-          write_output("\n  Customer ID: #{@customer_id}", :buffer => true)
-          write_output("\n  User: #{@user}", :buffer => true)
-          write_output("\n  Password: ********", :buffer => true)
-          write_output("\n  Timeout: #{@timeout} seconds", :buffer => true)
-          write_output("\n  Compare against: last #{@comparison_history} runs", :buffer => true)
-          write_output("\n  Email test reports to: #{@report_mailing_list.join(', ')}", :buffer => true)
-          write_output("\n  Total tests to run: #{@test_list.size}")
+        test_meta = []
+        url_meta = {}
 
-          test_meta = []
-          url_meta = {}
+        url_prefix = "ltp/live/customers/#{@customer_id}/selfservicejobs"
 
-          url_prefix = "ltp/live/customers/#{@customer_id}/selfservicejobs"
+        # Execute tests in sequence - per python example
+        first = true
+        @test_list.each do |item|
+          # Item consists of "ConfigurationName<comma>RunnableFileName"
+          # The second param appears to be optional
+          cols = item.split(',')
 
-          # Execute tests in sequence - per python example
-          @test_list.each do |item|
-            # Item consists of "ConfigurationName<comma>RunnableFileName"
-            # The second param appears to be optional
-            cols = item.split(',')
-
-            if !cols.empty?
-              # If we didn't get an executable name, throw in a blank
-              if cols.size < 2
-                cols << ''
-              end
-
-              data = {"ConfigurationName" => cols[0],
-                      "RunnableFileName" => cols[1],
-                      "ReportingOptions" => {
-                        "ComparisonHistory" => @comparison_history,
-                        "ReportMailingList" => @report_mailing_list
-                      }}
-
-              write_output "\n\nInitiating load-test '#{cols[0]}:#{cols[1]}'"
-
-              response = nil
-
-              begin
-                response = do_put(url_prefix, JSON.generate(data))
-              rescue Exception => e
-                raise TestAbortError, "Error invoking test '#{cols[0]}:#{cols[1]}' with payload\n#{JSON.pretty_generate(data)}\nError: #{e.class} #{e}"
-              end
-
-              apica_data = process_apica_loadtest_response('Start load-test', response.body)
-
-              # With the Test Job Id we can poll to see the progress of the job
-              job_id = apica_data[APICA_KEY_JOBID]
-
-              write_output "\nJob #{job_id}: Initiated"
-              test_complete = true
-              last_status = ''
-
-              Timeout::timeout(@timeout) {
-                begin
-                  sleep SNOOZE
-                  response = do_get("#{url_prefix}/#{job_id}")
-                  apica_data = process_apica_loadtest_response('Get load-test status', response.body)
-                  status = apica_data[APICA_KEY_STATUS]
-
-                  if status != last_status
-                    write_output("\nJob #{job_id}: #{status}")
-                  else
-                    write_output('.')
-                  end
-
-                  last_status = status
-                  test_complete = apica_data["Job completed successfully"]
-                end while !test_complete
-              }
-
-              report_url = apica_data[APICA_KEY_TEST_RESULTS_URL]
-
-              if !report_url.nil? && !report_url.empty?
-                url_meta["Job ##{job_id}"] = report_url
-                add_link("Apica Job ##{job_id}", report_url)
-                write_output("\nJob #{job_id}: Report viewable at #{report_url}")
-              end
-
-              meta = apica_data[APICA_KEY_METADATA] || {}
-              perf = apica_data[APICA_KEY_PERF] || {}
-
-              # Add some meta-meta
-              # Like total test #, duration, etc
-              # using what will hopefully be "well known keys" so UI doesn't have to be too smart
-              perf[WELL_KNOWN_DURATION] = meta[APICA_KEY_METADATA_DURATION] || 0
-              perf[WELL_KNOWN_PASS] = perf[APICA_KEY_PERF_TOTAL_PASS_LOOPS] || 0
-              perf[WELL_KNOWN_FAIL] = perf[APICA_KEY_PERF_TOTAL_FAIL_LOOPS] || 0
-              perf[WELL_KNOWN_TOTAL] = perf[WELL_KNOWN_PASS] + perf[WELL_KNOWN_FAIL]
-
-              stats = {}
-              STATS_MAPPING.each { |k, v| stats[k] = perf[v] if perf[v]}
-
-              test_meta << {"Job ##{job_id}" => stats}
+          if !cols.empty?
+            # If we didn't get an executable name, throw in a blank
+            if cols.size < 2
+              cols << ''
             end
-          end
 
-          save_output_value('test', test_meta)
-          save_output_value('links', url_meta)
-        rescue ConfigError, TestAbortError, ApicaAPIError, PermissionsError => e
-          @error = e.message
-        rescue Exception => e
-          @error = "Error executing Apica Tests: #{e.class} #{e}"
-          Maestro.log.warn("Error executing Apica Tests: #{e.class} #{e}: " + e.backtrace.join("\n"))
+            data = {"ConfigurationName" => cols[0],
+                    "RunnableFileName" => cols[1],
+                    "ReportingOptions" => {
+                      "ComparisonHistory" => @comparison_history,
+                      "ReportMailingList" => @report_mailing_list
+                    }}
+
+            write_output("\n", :buffer => false) unless first
+            write_output "\nInitiating load-test '#{cols[0]}:#{cols[1]}'"
+
+            response = nil
+
+            begin
+              response = do_put(url_prefix, JSON.generate(data))
+            rescue Exception => e
+              raise PluginError, "Error invoking test '#{cols[0]}:#{cols[1]}' with payload\n#{JSON.pretty_generate(data)}\nError: #{e.class} #{e}"
+            end
+
+            apica_data = process_apica_loadtest_response('Start load-test', response.body)
+
+            # With the Test Job Id we can poll to see the progress of the job
+            job_id = apica_data[APICA_KEY_JOBID]
+
+            write_output "\nJob #{job_id}: Initiated"
+            test_complete = true
+            last_status = ''
+
+            Timeout::timeout(@timeout) {
+              begin
+                sleep SNOOZE
+                response = do_get("#{url_prefix}/#{job_id}")
+                apica_data = process_apica_loadtest_response('Get load-test status', response.body)
+                status = apica_data[APICA_KEY_STATUS]
+
+                if status != last_status
+                  write_output("\nJob #{job_id}: #{status}")
+                else
+                  write_output('.')
+                end
+
+                last_status = status
+                test_complete = apica_data["Job completed successfully"]
+              end while !test_complete
+            }
+
+            report_url = apica_data[APICA_KEY_TEST_RESULTS_URL]
+
+            if !report_url.nil? && !report_url.empty?
+              url_meta["Job ##{job_id}"] = report_url
+              add_link("Apica Job ##{job_id}", report_url)
+              write_output("\nJob #{job_id}: Report viewable at #{report_url}")
+            end
+
+            meta = apica_data[APICA_KEY_METADATA] || {}
+            perf = apica_data[APICA_KEY_PERF] || {}
+
+            # Add some meta-meta
+            # Like total test #, duration, etc
+            # using what will hopefully be "well known keys" so UI doesn't have to be too smart
+            perf[WELL_KNOWN_DURATION] = meta[APICA_KEY_METADATA_DURATION] || 0
+            perf[WELL_KNOWN_PASS] = perf[APICA_KEY_PERF_TOTAL_PASS_LOOPS] || 0
+            perf[WELL_KNOWN_FAIL] = perf[APICA_KEY_PERF_TOTAL_FAIL_LOOPS] || 0
+            perf[WELL_KNOWN_TOTAL] = perf[WELL_KNOWN_PASS] + perf[WELL_KNOWN_FAIL]
+
+            stats = {}
+            STATS_MAPPING.each { |k, v| stats[k] = perf[v] if perf[v]}
+
+            test_meta << {"Job ##{job_id}" => stats}
+            write_output("\nCompleted load-test '#{cols[0]}:#{cols[1]}'", :buffer => false)
+            first = false
+          end
         end
 
-        write_output "\n\nAPICA LOADTEST task complete"
-        set_error(@error) if @error
+        save_output_value('test', test_meta)
+        save_output_value('links', url_meta)
       end
 
       def wpm_last_check
-        write_output("\nAPICA WPM RETRIEVE LAST CHECK task starting", :buffer => true)
+        # Raises error if invalid params passed
+        validate_wpm_parameters(WPM_LAST_VALUE)
 
-        begin
-          # Raises error if invalid params passed
-          validate_wpm_parameters(WPM_LAST_VALUE)
+#          write_output("\n\nConfiguration:", :buffer => true)
+#          write_output("\n  Server URL: #{@server_url}", :buffer => true)
+#          write_output("\n  User: #{@user}", :buffer => true)
+#          write_output("\n  Password: ********", :buffer => true)
+#          write_output("\n  Check GUID: #{@check_guid}", :buffer => true)
 
-          write_output("\n\nConfiguration:", :buffer => true)
-          write_output("\n  Server URL: #{@server_url}", :buffer => true)
-          write_output("\n  User: #{@user}", :buffer => true)
-          write_output("\n  Password: ********", :buffer => true)
-          write_output("\n  Check GUID: #{@check_guid}", :buffer => true)
+        response = do_get("wpm/Checks/#{@check_guid}/lastvalue")
+        apica_data = process_apica_wpm_response('Get wpm last value', WPM_LAST_VALUE, response.body)
 
-          response = do_get("wpm/Checks/#{@check_guid}/lastvalue")
-          apica_data = process_apica_wpm_response('Get wpm last value', WPM_LAST_VALUE, response.body)
-
-          write_output("\nApica WPM response:\n#{apica_data}", :buffer => true)
-        rescue ConfigError, TestAbortError, ApicaAPIError, PermissionsError => e
-          @error = e.message
-        rescue Exception => e
-          @error = "Error executing Apica WPM Fetch: #{e.class} #{e}"
-          Maestro.log.warn("Error executing Apica WPM Fetch: #{e.class} #{e}: " + e.backtrace.join("\n"))
-        end
-
-        write_output "\n\nAPICA WPM RETRIEVE LAST CHECK task complete"
-        set_error(@error) if @error
+        write_output("\nApica WPM response:\n#{apica_data}", :buffer => true)
       end
 
       def wpm_most_recent
-        write_output("\nAPICA WPM RETRIEVE MOST RECENT task starting", :buffer => true)
+        # Raises error if invalid params passed
+        validate_wpm_parameters(WPM_MOST_RECENT)
 
-        begin
-          # Raises error if invalid params passed
-          validate_wpm_parameters(WPM_MOST_RECENT)
+#          write_output("\n\nConfiguration:", :buffer => true)
+#          write_output("\n  Server URL: #{@server_url}", :buffer => true)
+#          write_output("\n  User: #{@user}", :buffer => true)
+#          write_output("\n  Password: ********", :buffer => true)
+#          write_output("\n  Check GUID: #{@check_guid}", :buffer => true)
+#          write_output("\n  From Date: #{@from_date}", :buffer => true)
+#          write_output("\n  To Date: #{@to_date}", :buffer => true)
+#          write_output("\n  Detail Level: #{@detail_level}", :buffer => true)
+#          write_output("\n  Count: #{@count}", :buffer => true)
 
-          write_output("\n\nConfiguration:", :buffer => true)
-          write_output("\n  Server URL: #{@server_url}", :buffer => true)
-          write_output("\n  User: #{@user}", :buffer => true)
-          write_output("\n  Password: ********", :buffer => true)
-          write_output("\n  Check GUID: #{@check_guid}", :buffer => true)
-          write_output("\n  From Date: #{@from_date}", :buffer => true)
-          write_output("\n  To Date: #{@to_date}", :buffer => true)
-          write_output("\n  Detail Level: #{@detail_level}", :buffer => true)
-          write_output("\n  Count: #{@count}", :buffer => true)
+        url = "wpm/Checks/#{@check_guid}/"
 
-          url = "wpm/Checks/#{@check_guid}/"
-
-          if @count
-            url = "#{url}mostrecent/#{@count}/?detail_level=#{@detail_level}"
-          else
-            url = "#{url}mostrecent/?fromUtc=#{@from_date}&toUtc=#{@to_date}&detail_level=#{@detail_level}"
-          end
-
-          response = do_get(url)
-          apica_data = process_apica_wpm_response('Get wpm most recent', WPM_MOST_RECENT, response.body)
-
-          write_output("\nApica WPM response:\n#{apica_data}", :buffer => true)
-        rescue ConfigError, TestAbortError, ApicaAPIError, PermissionsError => e
-          @error = e.message
-        rescue Exception => e
-          @error = "Error executing Apica WPM Fetch: #{e.class} #{e}"
-          Maestro.log.warn("Error executing Apica WPM Fetch: #{e.class} #{e}: " + e.backtrace.join("\n"))
+        if @count
+          url = "#{url}mostrecent/#{@count}/?detail_level=#{@detail_level}"
+        else
+          url = "#{url}mostrecent/?fromUtc=#{@from_date}&toUtc=#{@to_date}&detail_level=#{@detail_level}"
         end
 
-        write_output "\n\nAPICA WPM RETRIEVE MOST RECENT task complete"
-        set_error(@error) if @error
+        response = do_get(url)
+        apica_data = process_apica_wpm_response('Get wpm most recent', WPM_MOST_RECENT, response.body)
+
+        write_output("\nApica WPM response:\n#{apica_data}", :buffer => true)
       end
 
       def wpm_aggregated
-        write_output("\nAPICA WPM RETRIEVE AGGREGATED task starting", :buffer => true)
+        # Raises error if invalid params passed
+        validate_wpm_parameters(WPM_AGGREGATED)
 
-        begin
-          # Raises error if invalid params passed
-          validate_wpm_parameters(WPM_AGGREGATED)
+#          write_output("\n\nConfiguration:", :buffer => true)
+#          write_output("\n  Server URL: #{@server_url}", :buffer => true)
+#          write_output("\n  User: #{@user}", :buffer => true)
+#          write_output("\n  Password: ********", :buffer => true)
+#          write_output("\n  Check GUID: #{@check_guid}", :buffer => true)
+#          write_output("\n  From Date: #{@from_date}", :buffer => true)
+#          write_output("\n  To Date: #{@to_date}", :buffer => true)
+#          write_output("\n  Detail Level: #{@detail_level}", :buffer => true)
+#          write_output("\n  Count: #{@count}", :buffer => true)
 
-          write_output("\n\nConfiguration:", :buffer => true)
-          write_output("\n  Server URL: #{@server_url}", :buffer => true)
-          write_output("\n  User: #{@user}", :buffer => true)
-          write_output("\n  Password: ********", :buffer => true)
-          write_output("\n  Check GUID: #{@check_guid}", :buffer => true)
-          write_output("\n  From Date: #{@from_date}", :buffer => true)
-          write_output("\n  To Date: #{@to_date}", :buffer => true)
-          write_output("\n  Detail Level: #{@detail_level}", :buffer => true)
-          write_output("\n  Count: #{@count}", :buffer => true)
+        url = "wpm/Checks/#{@check_guid}/aggregated/?fromUtc=#{@from_date}&toUtc=#{@to_date}&detail_level=#{@detail_level}&scope=#{@scope}"
 
-          url = "wpm/Checks/#{@check_guid}/aggregated/?fromUtc=#{@from_date}&toUtc=#{@to_date}&detail_level=#{@detail_level}&scope=#{@scope}"
+        response = do_get(url)
+        apica_data = process_apica_wpm_response('Get wpm aggregated', WPM_AGGREGATED, response.body)
 
-          response = do_get(url)
-          apica_data = process_apica_wpm_response('Get wpm aggregated', WPM_AGGREGATED, response.body)
-
-          write_output("\nApica WPM response:\n#{apica_data}", :buffer => true)
-        rescue ConfigError, TestAbortError, ApicaAPIError, PermissionsError => e
-          @error = e.message
-        rescue Exception => e
-          @error = "Error executing Apica WPM Fetch: #{e.class} #{e}"
-          Maestro.log.warn("Error executing Apica WPM Fetch: #{e.class} #{e}: " + e.backtrace.join("\n"))
-        end
-
-        write_output "\n\nAPICA WPM RETRIEVE AGGREGATED task complete"
-        set_error(@error) if @error
+        write_output("\nApica WPM response:\n#{apica_data}", :buffer => true)
       end
 
       ###########
@@ -330,46 +269,26 @@ module MaestroDev
       ###########
       private
 
-      def booleanify(value)
-        res = false
-
-        if value
-          if value.is_a?(TrueClass) || value.is_a?(FalseClass)
-            res = value
-          elsif value.is_a?(Fixnum)
-            res = value != 0
-          elsif value.respond_to?(:to_s)
-            value = value.to_s.downcase
-
-            res = (value == 't' || value == 'true')
-          end
-        end
-
-        res
-      end
-
       def validate_common_parameters
         errors = []
 
         # Utility
-        @debug_mode = booleanify(get_field('debug_mode'))
+        @debug_mode = get_boolean_field('debug_mode')
 
         # Server & Auth
         @server_url = get_field('server_url', '')
         @user = get_field('user', '')
         @password = get_field('password')
-        @timeout = get_field('timeout', DEFAULT_TIMEOUT)
+        @timeout = get_int_field('timeout', DEFAULT_TIMEOUT)
 
         errors << 'Invalid server' if @server_url.empty?
         errors << "Server URL must start with 'http://' or 'https://'" if !@server_url.start_with?('http://', 'https://')
         errors << 'Invalid user' if @user.empty?
-        errors << "Invalid timeout #{@timeout} must be a number" unless @timeout.is_a?(Fixnum) || (@timeout.respond_to?(:to_i) && @timeout.to_i > 0)
+        errors << "Invalid timeout #{@timeout}" unless @timeout > 0
 
         unless @server_url.end_with?(['/'])
           @server_url = "#{@server_url}/"
         end
-
-        @timeout = @timeout.to_i
 
         return errors
       end
@@ -379,21 +298,18 @@ module MaestroDev
         errors = validate_common_parameters
 
         # Work
-        @customer_id = get_field('customer_id', '')
+        @customer_id = get_int_field('customer_id')
         @test_list = get_field('command_string', '')
-        @comparison_history = get_field('comparison_history', DEFAULT_COMPARISON_HISTORY)
+        @comparison_history = get_int_field('comparison_history', DEFAULT_COMPARISON_HISTORY)
         @report_mailing_list = get_field('report_mailing_list', [])
 
-        errors << 'Customer ID not specified' if @customer_id.respond_to?(:empty) && @customer_id.empty?
-        errors << "Customer ID #{@customer_id} invalid" unless @customer_id.is_a?(Fixnum) || (@customer_id.respond_to?(:to_i) && @customer_id.to_i > 0)
+        errors << 'Customer ID not specified' unless @customer_id > 0
         errors << 'No tests specified' if @test_list.empty?
         errors << "Comparison History must be between 0 and #{MAX_COMPARISON_HISTORY}" if @comparison_history < 0 || @comparison_history > MAX_COMPARISON_HISTORY
 
         if !errors.empty?
           raise ConfigError, "Configuration errors: #{errors.join(', ')}"
         end
-
-        @customer_id = @customer_id.to_i
       end
 
       # Specific parameters that need to be validated for wpm webperformance stuff
@@ -404,9 +320,9 @@ module MaestroDev
         @check_guid = get_field('check_guid', '')
         @from_date = get_field('from_date')
         @to_date = get_field('to_date')
-        @detail_level = get_field('detail_level', 1)
+        @detail_level = get_int_field('detail_level', 1)
         @scope = get_field('scope')
-        @count = get_field('count')
+        @count = get_int_field('count')
 
         # The rules:
         # ALL require "check_guid"
@@ -424,14 +340,14 @@ module MaestroDev
 
         if wpm_type == WPM_MOST_RECENT
           # Check count (optional)
-          errors << "'Count #{@count}' out of range.  Must be between 1 and <tbd>" if !@count.nil? && @count < 1
+          errors << "'Count #{@count}' out of range.  Must be between 1 and <tbd>" if @count < 1
         end
 
         if wpm_type == WPM_AGGREGATED || wpm_type == WPM_MOST_RECENT
           # Check detail level
           errors << "'Detail Level #{@detail_level}' out of range.  Must be between 1 and 3" if @detail_level < 1 || @detail_level > 3
 
-          if wpm_type == WPM_AGGREGATED || @count.nil?
+          if wpm_type == WPM_AGGREGATED || @count == 0
             # Check scope
             @scope = @scope.downcase if @scope
             errors << "'Scope #{@scope}' out of range.  Must be either 'd' (day), or 'h' (hour)" if @scope != 'd' && @scope != 'h'
@@ -471,7 +387,7 @@ module MaestroDev
 
         if !apica_data[APICA_KEY_SUCCESS]
           write_output("\n[#{state}] Apica API call failed\nRaw API response:\n------\n#{body}\n------\n")
-          raise ApicaAPIError, "Apica API call failed with status #{msg}"
+          raise PluginError, "Apica API call failed with status #{msg}"
         end
 
         apica_data
@@ -556,9 +472,9 @@ module MaestroDev
 
             case response.code
             when 401 then # UNAUTHORIZED
-              rause UnauthorizedError, 'Not permitted access (did you specify a user/password?)'
+              rause PluginError, 'Not permitted access (did you specify a user/password?)'
             when 403 then # FORBIDDEN
-              raise ForbiddenError, 'User or Password is incorrect'
+              raise PluginError, 'User or Password is incorrect'
             else
               write_output("\nError in #{request.method} #{uri}#{username_s}: #{response.code} #{response.message}")
               response.error!

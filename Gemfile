@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 #dependencies
-gem 'maestro_plugin', '>=0.0.5'
+gem 'maestro_plugin', '>=0.0.17'
 gem 'jruby-openssl'
 
 group :development do

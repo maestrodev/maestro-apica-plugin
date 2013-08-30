@@ -1,5 +1,6 @@
 maestro-apica-plugin
 ====================
+[![Code Climate](https://codeclimate.com/github/maestrodev/maestro-apica-plugin.png)](https://codeclimate.com/github/maestrodev/maestro-apica-plugin)
 
 A Maestro Plugin that provides integration with Apica Test Tools
 
